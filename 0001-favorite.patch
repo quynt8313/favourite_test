@@ -1,0 +1,1049 @@
+From 00827149c295d269fc74d4e8a85dcc063cc5ed40 Mon Sep 17 00:00:00 2001
+From: "yeucon12359@gmail.com" <yeucon12359@gmail.com>
+Date: Fri, 28 Oct 2022 17:57:03 +0700
+Subject: [PATCH] favorite
+
+---
+ .editorconfig                                 | 21 ++++++
+ .ruby-version                                 |  2 +-
+ Gemfile                                       |  2 +
+ Gemfile.lock                                  | 21 ++++++
+ app/controllers/favorite_controller.rb        | 13 ++++
+ app/controllers/favorites_controller.rb       | 15 ++++
+ app/controllers/products_controller.rb        | 25 +++++++
+ app/controllers/shops_controller.rb           | 28 ++++++++
+ app/controllers/users/sessions_controller.rb  |  4 ++
+ app/javascript/packs/application.js           |  5 ++
+ app/javascript/packs/favorite.js              | 68 +++++++++++++++++++
+ app/javascript/stylesheets/application.scss   |  1 +
+ app/models/favorite.rb                        |  6 ++
+ app/models/product.rb                         |  1 +
+ app/models/shop.rb                            |  1 +
+ app/models/user.rb                            | 10 +++
+ app/views/favorites/index.html.erb            | 24 +++++++
+ app/views/layouts/application.html.erb        | 16 ++++-
+ app/views/products/show.html.erb              |  8 ++-
+ app/views/shared/_favorite_button.html.erb    |  7 ++
+ app/views/shops/index.html.erb                | 29 +++++++-
+ app/views/shops/show.html.erb                 | 34 ++++++++--
+ app/views/users/sessions/new.html.erb         | 26 +++++++
+ .../users/shared/_error_messages.html.erb     | 15 ++++
+ app/views/users/shared/_links.html.erb        | 25 +++++++
+ config/initializers/devise.rb                 | 16 +++++
+ config/locales/devise.en.yml                  | 65 ++++++++++++++++++
+ config/routes.rb                              | 22 +++++-
+ config/webpack/environment.js                 |  8 +++
+ .../20221027093806_devise_create_users.rb     | 44 ++++++++++++
+ db/migrate/20221027093921_create_favorites.rb | 10 +++
+ db/schema.rb                                  | 24 ++++++-
+ db/seeds.rb                                   | 12 ++++
+ package.json                                  |  7 ++
+ yarn.lock                                     | 20 ++++++
+ 35 files changed, 621 insertions(+), 14 deletions(-)
+ create mode 100644 .editorconfig
+ create mode 100644 app/controllers/favorite_controller.rb
+ create mode 100644 app/controllers/favorites_controller.rb
+ create mode 100644 app/controllers/users/sessions_controller.rb
+ create mode 100644 app/javascript/packs/favorite.js
+ create mode 100644 app/javascript/stylesheets/application.scss
+ create mode 100644 app/models/favorite.rb
+ create mode 100644 app/models/user.rb
+ create mode 100644 app/views/favorites/index.html.erb
+ create mode 100644 app/views/shared/_favorite_button.html.erb
+ create mode 100644 app/views/users/sessions/new.html.erb
+ create mode 100644 app/views/users/shared/_error_messages.html.erb
+ create mode 100644 app/views/users/shared/_links.html.erb
+ create mode 100644 config/initializers/devise.rb
+ create mode 100644 config/locales/devise.en.yml
+ create mode 100644 db/migrate/20221027093806_devise_create_users.rb
+ create mode 100644 db/migrate/20221027093921_create_favorites.rb
+
+diff --git a/.editorconfig b/.editorconfig
+new file mode 100644
+index 0000000..dae9c04
+--- /dev/null
++++ b/.editorconfig
+@@ -0,0 +1,21 @@
++# EditorConfig helps developers define and maintain consistent
++# coding styles between different editors and IDEs
++# editorconfig.org
++
++root = true
++
++
++[*]
++end_of_line = lf
++charset = utf-8
++trim_trailing_whitespace = true
++insert_final_newline = true
++indent_style = space
++indent_size = 2
++
++[*.txt]
++indent_style = tab
++indent_size = 4
++
++[*.{diff,md}]
++trim_trailing_whitespace = false
+diff --git a/.ruby-version b/.ruby-version
+index 849c0c4..a603bb5 100644
+--- a/.ruby-version
++++ b/.ruby-version
+@@ -1 +1 @@
+-ruby-2.7.5
++2.7.5
+diff --git a/Gemfile b/Gemfile
+index 0f4aea4..062f7de 100644
+--- a/Gemfile
++++ b/Gemfile
+@@ -27,6 +27,7 @@ gem 'jbuilder', '~> 2.7'
+ 
+ # Reduces boot times through caching; required in config/boot.rb
+ gem 'bootsnap', '>= 1.4.4', require: false
++gem 'devise'
+ 
+ group :development, :test do
+   # Call 'byebug' anywhere in the code to stop execution and get a debugger console
+@@ -42,6 +43,7 @@ group :development do
+   gem 'listen', '~> 3.3'
+   # Spring speeds up development by keeping your application running in the background. Read more: https://github.com/rails/spring
+   gem 'spring'
++  gem 'pry-rails'
+ end
+ 
+ group :test do
+diff --git a/Gemfile.lock b/Gemfile.lock
+index 05c6e4d..dfdc78d 100644
+--- a/Gemfile.lock
++++ b/Gemfile.lock
+@@ -62,6 +62,7 @@ GEM
+       zeitwerk (~> 2.3)
+     addressable (2.8.0)
+       public_suffix (>= 2.0.2, < 5.0)
++    bcrypt (3.1.18)
+     bindex (0.8.1)
+     bootsnap (1.11.1)
+       msgpack (~> 1.2)
+@@ -77,8 +78,15 @@ GEM
+       regexp_parser (>= 1.5, < 3.0)
+       xpath (~> 3.2)
+     childprocess (4.1.0)
++    coderay (1.1.3)
+     concurrent-ruby (1.1.10)
+     crass (1.0.6)
++    devise (4.8.1)
++      bcrypt (~> 3.0)
++      orm_adapter (~> 0.1)
++      railties (>= 4.1.0)
++      responders
++      warden (~> 1.2.3)
+     erubi (1.10.0)
+     ffi (1.15.5)
+     globalid (1.0.0)
+@@ -107,6 +115,12 @@ GEM
+     nokogiri (1.13.3)
+       mini_portile2 (~> 2.8.0)
+       racc (~> 1.4)
++    orm_adapter (0.5.0)
++    pry (0.14.1)
++      coderay (~> 1.1)
++      method_source (~> 1.0)
++    pry-rails (0.3.9)
++      pry (>= 0.10.4)
+     public_suffix (4.0.6)
+     puma (5.6.2)
+       nio4r (~> 2.0)
+@@ -149,6 +163,9 @@ GEM
+     rb-inotify (0.10.1)
+       ffi (~> 1.0)
+     regexp_parser (2.2.1)
++    responders (3.0.1)
++      actionpack (>= 5.0)
++      railties (>= 5.0)
+     rexml (3.2.5)
+     rubyzip (2.3.2)
+     sass-rails (6.0.0)
+@@ -182,6 +199,8 @@ GEM
+     turbolinks-source (5.2.0)
+     tzinfo (2.0.4)
+       concurrent-ruby (~> 1.0)
++    warden (1.2.9)
++      rack (>= 2.0.9)
+     web-console (4.2.0)
+       actionview (>= 6.0.0)
+       activemodel (>= 6.0.0)
+@@ -210,8 +229,10 @@ DEPENDENCIES
+   bootsnap (>= 1.4.4)
+   byebug
+   capybara (>= 3.26)
++  devise
+   jbuilder (~> 2.7)
+   listen (~> 3.3)
++  pry-rails
+   puma (~> 5.0)
+   rack-mini-profiler (~> 2.0)
+   rails (~> 6.1.4, >= 6.1.4.4)
+diff --git a/app/controllers/favorite_controller.rb b/app/controllers/favorite_controller.rb
+new file mode 100644
+index 0000000..39ecdf3
+--- /dev/null
++++ b/app/controllers/favorite_controller.rb
+@@ -0,0 +1,13 @@
++class FavoritesController < ApplicationController
++  before_action :authenticate_user!
++  def index
++    @favorites = current_user.favorites
++  end
++
++  def destroy
++    favorite = Favorite.find params[:id]
++    return render json: { message: 'Remove Fail' }, status: 422 unless favorite.destroy
++
++    render json: { message: "Remove favorite #{favorite.favoriteable_type} success" }
++  end
++end
+diff --git a/app/controllers/favorites_controller.rb b/app/controllers/favorites_controller.rb
+new file mode 100644
+index 0000000..2309987
+--- /dev/null
++++ b/app/controllers/favorites_controller.rb
+@@ -0,0 +1,15 @@
++class FavoritesController < ApplicationController
++  before_action :authenticate_user!
++
++  def index
++    @favorites = current_user.favorites
++  end
++
++  def destroy
++    favorite = Favorite.find params[:id]
++
++    return render json: { message: 'Remove Fail' }, status: 422 unless favorite.destroy
++
++    render json: { message: "Remove favorite #{favorite.favoriteable_type} #{} success" }
++  end
++end
+diff --git a/app/controllers/products_controller.rb b/app/controllers/products_controller.rb
+index 61678df..09ea68a 100644
+--- a/app/controllers/products_controller.rb
++++ b/app/controllers/products_controller.rb
+@@ -1,5 +1,30 @@
+ class ProductsController < ApplicationController
++  before_action :authenticate_user!
++  before_action :fetch_product
++
+   def show
++    @favorite_product = current_user.favorite_products.find_by(id: @product.id)
++  end
++
++  def add_favorite
++    favorite = current_user.favorites.build(favoriteable: @product)
++    return render json: { message: "Add product to favorite fail" }, status: 422 unless favorite.save
++
++    render json: { message: "Add #{@product.name} to my favorites success" }
++  end
++
++  def remove_favorite
++    favorite = @product.favorites.find_by(user_id: current_user.id)
++    return render json: { message: 'Product is not added to your list favorites' }, status: 404 if favorite.blank?
++
++    return render json: { message: 'Remove Fail' }, status: 422 unless favorite.destroy
++
++    render json: { message: "Remove favorite #{favorite.favoriteable_type} success" }
++  end
++
++  private
++
++  def fetch_product
+     @product = Product.find params[:id]
+   end
+ end
+diff --git a/app/controllers/shops_controller.rb b/app/controllers/shops_controller.rb
+index bdc7c52..fa08f5e 100644
+--- a/app/controllers/shops_controller.rb
++++ b/app/controllers/shops_controller.rb
+@@ -1,9 +1,37 @@
+ class ShopsController < ApplicationController
++  before_action :authenticate_user!
++  before_action :fetch_shop, only: %i[show add_favorite remove_favorite]
++  
+   def index
+     @shops = Shop.all
++    @favorite_shops = current_user.favorite_shops
+   end
+ 
+   def show
++    @products = @shop.products
++    @favorite_shop = current_user.favorite_shops.find_by(id: @shop.id)
++    @favorite_products = current_user.favorite_products
++  end
++
++  def add_favorite
++    favorite = current_user.favorites.build(favoriteable: @shop)
++    return render json: { message: "Add shop to favorite fail" }, status: 422 unless favorite.save
++
++    render json: { message: "Add #{@shop.name} to your favorites success" }
++  end
++
++  def remove_favorite
++    favorite = @shop.favorites.find_by(user_id: current_user.id)
++    return render json: { message: 'Shop is not added to your list favorites' }, status: 404 if favorite.blank?
++
++    return render json: { message: 'Remove Fail' }, status: 422 unless favorite.destroy
++
++    render json: { message: "Remove favorite #{favorite.favoriteable_type} success" }
++  end
++
++  private
++
++  def fetch_shop
+     @shop = Shop.find params[:id]
+   end
+ end
+diff --git a/app/controllers/users/sessions_controller.rb b/app/controllers/users/sessions_controller.rb
+new file mode 100644
+index 0000000..97215e0
+--- /dev/null
++++ b/app/controllers/users/sessions_controller.rb
+@@ -0,0 +1,4 @@
++# frozen_string_literal: true
++
++class Users::SessionsController < Devise::SessionsController
++end
+diff --git a/app/javascript/packs/application.js b/app/javascript/packs/application.js
+index f710851..0d9de4a 100644
+--- a/app/javascript/packs/application.js
++++ b/app/javascript/packs/application.js
+@@ -7,7 +7,12 @@ import Rails from "@rails/ujs"
+ import Turbolinks from "turbolinks"
+ import * as ActiveStorage from "@rails/activestorage"
+ import "channels"
++import "bootstrap"
++import "../stylesheets/application"
++import Favorite from './favorite'
+ 
+ Rails.start()
+ Turbolinks.start()
+ ActiveStorage.start()
++
++window.Favorite = new Favorite();
+diff --git a/app/javascript/packs/favorite.js b/app/javascript/packs/favorite.js
+new file mode 100644
+index 0000000..cbc8eb6
+--- /dev/null
++++ b/app/javascript/packs/favorite.js
+@@ -0,0 +1,68 @@
++export default class Favorite {
++  add(event, urlButton, id) {
++    event.preventDefault()
++    let ele = event.target
++    let url = $(ele).attr('href')
++    let callAjax = Favorite._callAjax(url, {}, 'json', 'POST')
++    callAjax.done((response) => {
++      Favorite._messageSuccess(response.message)
++      $(`.favorite_${id}`).html(Favorite._favoriteButtonRemove(urlButton, url, id))
++    }).fail((response) => {
++      Favorite._messageError(response.responseJSON.message)
++    })
++  }
++
++  remove(event, urlButton, id) {
++    event.preventDefault()
++    let ele = event.target
++    let url = $(ele).attr('href')
++    let callAjax = Favorite._callAjax(url, {}, 'json', 'DELETE')
++    callAjax.done((response) => {
++      Favorite._messageSuccess(response.message)
++      $(`.favorite_${id}`).html(Favorite._favoriteButtonAdd(urlButton, url, id))
++    }).fail((response) => {
++      Favorite._messageError(response.responseJSON.message)
++    })
++  }
++
++  destroy(event) {
++    event.preventDefault()
++    let ele = event.target
++    let url = $(ele).attr('href')
++    let callAjax = Favorite._callAjax(url, {}, 'json', 'DELETE')
++    callAjax.done((response) => {
++      Favorite._messageSuccess(response.message)
++      $(ele).parents('tr').remove()
++    }).fail((response) => {
++      Favorite._messageError(response.responseJSON.message)
++    })
++  }
++
++  static _favoriteButtonAdd(href, url, id) {
++    return `<a href='${href}' class='btn btn-success' onclick="Favorite.add(event, '${url}', '${id}')" >Add Favorite</a>`
++  }
++
++  static _favoriteButtonRemove(href, url, id) {
++    return `<a href='${href}' class='btn btn-danger' onclick="Favorite.remove(event, '${url}', '${id}')">Remove Favorite</a>`
++  }
++
++  static _messageError(message) {
++    $('.message').html(`<p class='text-danger'>${message}</p>`)
++  }
++
++  static _messageSuccess(message) {
++    $('.message').html(`<p class='text-success'>${message}</p>`)
++  }
++
++  static _callAjax(url, data, dataType, method) {
++    let callAjax = $.ajax({
++      method: method,
++      url: url,
++      dataType: dataType,
++      data: data
++    })
++    return callAjax
++  }
++}
++
++
+diff --git a/app/javascript/stylesheets/application.scss b/app/javascript/stylesheets/application.scss
+new file mode 100644
+index 0000000..19b0ca9
+--- /dev/null
++++ b/app/javascript/stylesheets/application.scss
+@@ -0,0 +1 @@
++@import "~bootstrap/scss/bootstrap";
+diff --git a/app/models/favorite.rb b/app/models/favorite.rb
+new file mode 100644
+index 0000000..905db89
+--- /dev/null
++++ b/app/models/favorite.rb
+@@ -0,0 +1,6 @@
++class Favorite < ApplicationRecord
++  belongs_to :favoriteable, polymorphic: true
++  belongs_to :user
++
++  validates :user_id, uniqueness: { scope: [:favoriteable_type, :favoriteable_id] }
++end
+diff --git a/app/models/product.rb b/app/models/product.rb
+index 73f5d40..3a4e0e7 100644
+--- a/app/models/product.rb
++++ b/app/models/product.rb
+@@ -1,3 +1,4 @@
+ class Product < ApplicationRecord
+   belongs_to :shop
++  has_many :favorites, as: :favoriteable
+ end
+diff --git a/app/models/shop.rb b/app/models/shop.rb
+index fc62c05..3ec666a 100644
+--- a/app/models/shop.rb
++++ b/app/models/shop.rb
+@@ -1,3 +1,4 @@
+ class Shop < ApplicationRecord
+   has_many :products
++  has_many :favorites, as: :favoriteable
+ end
+diff --git a/app/models/user.rb b/app/models/user.rb
+new file mode 100644
+index 0000000..cc39e5e
+--- /dev/null
++++ b/app/models/user.rb
+@@ -0,0 +1,10 @@
++class User < ApplicationRecord
++  # Include default devise modules. Others available are:
++  # :confirmable, :lockable, :timeoutable, :trackable and :omniauthable
++  devise :database_authenticatable, :registerable,
++         :recoverable, :rememberable, :validatable
++
++  has_many :favorites
++  has_many :favorite_shops, through: :favorites, source: :favoriteable, source_type: "Shop"
++  has_many :favorite_products, through: :favorites, source: :favoriteable, source_type: "Product"
++end
+diff --git a/app/views/favorites/index.html.erb b/app/views/favorites/index.html.erb
+new file mode 100644
+index 0000000..fb54757
+--- /dev/null
++++ b/app/views/favorites/index.html.erb
+@@ -0,0 +1,24 @@
++<h1 class='text-center'>Favorite List</h1>
++<table class="table">
++  <thead>
++    <tr>
++      <th scope="col">#</th>
++      <th scope="col">Type</th>
++      <th scope="col">Name</th>
++      <th scope="col"></th>
++    </tr>
++  </thead>
++  <tbody>
++    <% @favorites.each do |favorite| %>
++      <tr>
++        <th scope="row"><%= favorite.id %></th>
++        <th><%= favorite.favoriteable_type %></th>
++        <th><%= favorite.favoriteable.name %></th>
++        <td>
++          <%= link_to "Remove Favorite", favorite_path(favorite.id), class: 'btn btn-danger',
++                                         onclick: "Favorite.destroy(event)" %>
++        </td>
++      </tr>
++    <% end %>
++  </tbody>
++</table>
+diff --git a/app/views/layouts/application.html.erb b/app/views/layouts/application.html.erb
+index f62194a..3fb0fc5 100644
+--- a/app/views/layouts/application.html.erb
++++ b/app/views/layouts/application.html.erb
+@@ -6,11 +6,23 @@
+     <%= csrf_meta_tags %>
+     <%= csp_meta_tag %>
+ 
+-    <%= stylesheet_link_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
++    <%= stylesheet_pack_tag 'application', media: 'all', 'data-turbolinks-track': 'reload' %>
+     <%= javascript_pack_tag 'application', 'data-turbolinks-track': 'reload' %>
+   </head>
+ 
+   <body>
+-    <%= yield %>
++    <div class="container mt-5">
++      <div class='d-flex'>
++        <div class='me-5'><%= link_to 'List Shop', shops_path %></div>
++        <div class='me-5'><%= link_to 'List Favorite', favorites_path %></div>
++        <div>
++          <% if current_user %>
++            <%= link_to 'Log Out', destroy_user_session_path, method: :delete %>
++          <% end %>
++        </div>
++      </div>
++      <div class='message'></div>
++      <%= yield %>
++    </div>
+   </body>
+ </html>
+diff --git a/app/views/products/show.html.erb b/app/views/products/show.html.erb
+index bf32e86..0d4998c 100644
+--- a/app/views/products/show.html.erb
++++ b/app/views/products/show.html.erb
+@@ -1 +1,7 @@
+-<h1><%= @product.name %></h1>
++<h1 class='text-center'><%= @product.name %></h1>
++<div class='<%= "favorite_product_#{@product.id}" %>'>
++  <%= render 'shared/favorite_button', is_favorite: @favorite_product.present?,
++                                       remove_action: remove_favorite_product_path(@product.id),
++                                       add_action: add_favorite_product_path(@product.id),
++                                       id: "product_#{@product.id}" %>
++</div>
+diff --git a/app/views/shared/_favorite_button.html.erb b/app/views/shared/_favorite_button.html.erb
+new file mode 100644
+index 0000000..e845e2b
+--- /dev/null
++++ b/app/views/shared/_favorite_button.html.erb
+@@ -0,0 +1,7 @@
++<% if is_favorite %>
++  <%= link_to "Remove Favorite", remove_action, class: 'btn btn-danger',
++    onclick: "Favorite.remove(event, '#{add_action}', '#{id}')"%>
++<% else %>
++  <%= link_to "Add Favorite", add_action, class: 'btn btn-success',
++    onclick: "Favorite.add(event, '#{remove_action}', '#{id}')" %>
++<% end %>
+diff --git a/app/views/shops/index.html.erb b/app/views/shops/index.html.erb
+index 48d2601..e28c65f 100644
+--- a/app/views/shops/index.html.erb
++++ b/app/views/shops/index.html.erb
+@@ -1,3 +1,26 @@
+-<% @shops.each do |shop| %>
+-  <h2><%= link_to shop.name, shop %></h2>
+-<% end %>
++<div class='text-center'>
++  <h1>List Shop</h1>
++</div>
++<table class="table">
++  <thead>
++    <tr>
++      <th scope="col">#</th>
++      <th scope="col">Name</th>
++      <th scope="col"></th>
++    </tr>
++  </thead>
++  <tbody>
++    <% @shops.each do |shop| %>
++      <tr>
++        <th scope="row"><%= shop.id %></th>
++        <td><%= link_to shop.name, shop_path(shop.id) %></td>
++        <td class='<%= "favorite_shop_#{shop.id}" %>'>
++          <%= render 'shared/favorite_button', is_favorite: @favorite_shops.ids.include?(shop.id),
++                                               remove_action: remove_favorite_shop_path(shop.id),
++                                               add_action: add_favorite_shop_path(shop.id),
++                                               id: "shop_#{shop.id}" %>
++        </td>
++      </tr>
++    <% end %>
++  </tbody>
++</table>
+diff --git a/app/views/shops/show.html.erb b/app/views/shops/show.html.erb
+index 559c4cd..a19e1fa 100644
+--- a/app/views/shops/show.html.erb
++++ b/app/views/shops/show.html.erb
+@@ -1,4 +1,30 @@
+-<h1><%= @shop.name%></h1>
+-<% @shop.products.each do |product| %>
+-  <h2><%= link_to product.name, product %></h2>
+-<% end %>
++<h1 class='text-center'><%= @shop.name%></h1>
++<div class='<%= "favorite_shop_#{@shop.id}" %>'>
++  <%= render 'shared/favorite_button', is_favorite: @favorite_shop.present?,
++                                       remove_action: remove_favorite_shop_path(@shop.id),
++                                       add_action: add_favorite_shop_path(@shop.id),
++                                       id: "shop_#{@shop.id}" %>
++</div>
++<table class="table">
++  <thead>
++    <tr>
++      <th scope="col">#</th>
++      <th scope="col">Product Name</th>
++      <th scope="col"></th>
++    </tr>
++  </thead>
++  <tbody>
++    <% @products.each do |product| %>
++      <tr>
++        <th scope="row"><%= product.id %></th>
++        <td><%= link_to product.name, product_path(product.id) %></td>
++        <td class='<%= "favorite_product_#{product.id}" %>'>
++          <%= render 'shared/favorite_button', is_favorite: @favorite_products.ids.include?(product.id),
++                                               remove_action: remove_favorite_product_path(product.id),
++                                               add_action: add_favorite_product_path(product.id),
++                                               id: "product_#{product.id}" %>
++        </td>
++      </tr>
++    <% end %>
++  </tbody>
++</table>
+diff --git a/app/views/users/sessions/new.html.erb b/app/views/users/sessions/new.html.erb
+new file mode 100644
+index 0000000..34fe633
+--- /dev/null
++++ b/app/views/users/sessions/new.html.erb
+@@ -0,0 +1,26 @@
++<h2>Log in</h2>
++<div class="">
++<%= form_for(resource, as: resource_name, url: session_path(resource_name)) do |f| %>
++  <div class="mb-3 row">
++    <%= f.label :email, class: "col-sm-2 col-form-label" %>
++    <div class="col-sm-10">
++      <%= f.email_field :email, autofocus: true, autocomplete: "email", class: "form-control" %>
++    </div>
++  </div>
++  <div class="mb-3 row">
++    <%= f.label :password, class: "col-sm-2 col-form-label" %>
++    <div class="col-sm-10">
++      <%= f.password_field :password, autocomplete: "current-password", class: "form-control" %>
++    </div>
++  </div>
++  <% if devise_mapping.rememberable? %>
++    <div class="field">
++      <%= f.check_box :remember_me %>
++      <%= f.label :remember_me %>
++    </div>
++  <% end %>
++
++  <div class="actions text-center">
++    <%= f.submit "Log in", class: 'btn btn-primary' %>
++  </div>
++<% end %>
+diff --git a/app/views/users/shared/_error_messages.html.erb b/app/views/users/shared/_error_messages.html.erb
+new file mode 100644
+index 0000000..ba7ab88
+--- /dev/null
++++ b/app/views/users/shared/_error_messages.html.erb
+@@ -0,0 +1,15 @@
++<% if resource.errors.any? %>
++  <div id="error_explanation">
++    <h2>
++      <%= I18n.t("errors.messages.not_saved",
++                 count: resource.errors.count,
++                 resource: resource.class.model_name.human.downcase)
++       %>
++    </h2>
++    <ul>
++      <% resource.errors.full_messages.each do |message| %>
++        <li><%= message %></li>
++      <% end %>
++    </ul>
++  </div>
++<% end %>
+diff --git a/app/views/users/shared/_links.html.erb b/app/views/users/shared/_links.html.erb
+new file mode 100644
+index 0000000..96a9412
+--- /dev/null
++++ b/app/views/users/shared/_links.html.erb
+@@ -0,0 +1,25 @@
++<%- if controller_name != 'sessions' %>
++  <%= link_to "Log in", new_session_path(resource_name) %><br />
++<% end %>
++
++<%- if devise_mapping.registerable? && controller_name != 'registrations' %>
++  <%= link_to "Sign up", new_registration_path(resource_name) %><br />
++<% end %>
++
++<%- if devise_mapping.recoverable? && controller_name != 'passwords' && controller_name != 'registrations' %>
++  <%= link_to "Forgot your password?", new_password_path(resource_name) %><br />
++<% end %>
++
++<%- if devise_mapping.confirmable? && controller_name != 'confirmations' %>
++  <%= link_to "Didn't receive confirmation instructions?", new_confirmation_path(resource_name) %><br />
++<% end %>
++
++<%- if devise_mapping.lockable? && resource_class.unlock_strategy_enabled?(:email) && controller_name != 'unlocks' %>
++  <%= link_to "Didn't receive unlock instructions?", new_unlock_path(resource_name) %><br />
++<% end %>
++
++<%- if devise_mapping.omniauthable? %>
++  <%- resource_class.omniauth_providers.each do |provider| %>
++    <%= link_to "Sign in with #{OmniAuth::Utils.camelize(provider)}", omniauth_authorize_path(resource_name, provider), method: :post %><br />
++  <% end %>
++<% end %>
+diff --git a/config/initializers/devise.rb b/config/initializers/devise.rb
+new file mode 100644
+index 0000000..82fc544
+--- /dev/null
++++ b/config/initializers/devise.rb
+@@ -0,0 +1,16 @@
++# frozen_string_literal: true
++
++Devise.setup do |config|
++  config.mailer_sender = 'please-change-me-at-config-initializers-devise@example.com'
++  require 'devise/orm/active_record'
++  config.case_insensitive_keys = [:email]
++  config.strip_whitespace_keys = [:email]
++  config.skip_session_storage = [:http_auth]
++  config.stretches = Rails.env.test? ? 1 : 12
++  config.reconfirmable = true
++  config.expire_all_remember_me_on_sign_out = true
++  config.password_length = 6..128
++  config.email_regexp = /\A[^@\s]+@[^@\s]+\z/
++  config.reset_password_within = 6.hours
++  config.sign_out_via = :delete
++end
+diff --git a/config/locales/devise.en.yml b/config/locales/devise.en.yml
+new file mode 100644
+index 0000000..260e1c4
+--- /dev/null
++++ b/config/locales/devise.en.yml
+@@ -0,0 +1,65 @@
++# Additional translations at https://github.com/heartcombo/devise/wiki/I18n
++
++en:
++  devise:
++    confirmations:
++      confirmed: "Your email address has been successfully confirmed."
++      send_instructions: "You will receive an email with instructions for how to confirm your email address in a few minutes."
++      send_paranoid_instructions: "If your email address exists in our database, you will receive an email with instructions for how to confirm your email address in a few minutes."
++    failure:
++      already_authenticated: "You are already signed in."
++      inactive: "Your account is not activated yet."
++      invalid: "Invalid %{authentication_keys} or password."
++      locked: "Your account is locked."
++      last_attempt: "You have one more attempt before your account is locked."
++      not_found_in_database: "Invalid %{authentication_keys} or password."
++      timeout: "Your session expired. Please sign in again to continue."
++      unauthenticated: "You need to sign in or sign up before continuing."
++      unconfirmed: "You have to confirm your email address before continuing."
++    mailer:
++      confirmation_instructions:
++        subject: "Confirmation instructions"
++      reset_password_instructions:
++        subject: "Reset password instructions"
++      unlock_instructions:
++        subject: "Unlock instructions"
++      email_changed:
++        subject: "Email Changed"
++      password_change:
++        subject: "Password Changed"
++    omniauth_callbacks:
++      failure: "Could not authenticate you from %{kind} because \"%{reason}\"."
++      success: "Successfully authenticated from %{kind} account."
++    passwords:
++      no_token: "You can't access this page without coming from a password reset email. If you do come from a password reset email, please make sure you used the full URL provided."
++      send_instructions: "You will receive an email with instructions on how to reset your password in a few minutes."
++      send_paranoid_instructions: "If your email address exists in our database, you will receive a password recovery link at your email address in a few minutes."
++      updated: "Your password has been changed successfully. You are now signed in."
++      updated_not_active: "Your password has been changed successfully."
++    registrations:
++      destroyed: "Bye! Your account has been successfully cancelled. We hope to see you again soon."
++      signed_up: "Welcome! You have signed up successfully."
++      signed_up_but_inactive: "You have signed up successfully. However, we could not sign you in because your account is not yet activated."
++      signed_up_but_locked: "You have signed up successfully. However, we could not sign you in because your account is locked."
++      signed_up_but_unconfirmed: "A message with a confirmation link has been sent to your email address. Please follow the link to activate your account."
++      update_needs_confirmation: "You updated your account successfully, but we need to verify your new email address. Please check your email and follow the confirmation link to confirm your new email address."
++      updated: "Your account has been updated successfully."
++      updated_but_not_signed_in: "Your account has been updated successfully, but since your password was changed, you need to sign in again."
++    sessions:
++      signed_in: "Signed in successfully."
++      signed_out: "Signed out successfully."
++      already_signed_out: "Signed out successfully."
++    unlocks:
++      send_instructions: "You will receive an email with instructions for how to unlock your account in a few minutes."
++      send_paranoid_instructions: "If your account exists, you will receive an email with instructions for how to unlock it in a few minutes."
++      unlocked: "Your account has been unlocked successfully. Please sign in to continue."
++  errors:
++    messages:
++      already_confirmed: "was already confirmed, please try signing in"
++      confirmation_period_expired: "needs to be confirmed within %{period}, please request a new one"
++      expired: "has expired, please request a new one"
++      not_found: "not found"
++      not_locked: "was not locked"
++      not_saved:
++        one: "1 error prohibited this %{resource} from being saved:"
++        other: "%{count} errors prohibited this %{resource} from being saved:"
+diff --git a/config/routes.rb b/config/routes.rb
+index 870072d..2fcd6ed 100644
+--- a/config/routes.rb
++++ b/config/routes.rb
+@@ -1,6 +1,24 @@
+ Rails.application.routes.draw do
++  devise_for :users, controllers: {
++    sessions: 'users/sessions'
++  }
++
++  root 'shops#index'
++
+   # For details on the DSL available within this file, see https://guides.rubyonrails.org/routing.html
+ 
+-  resources :products
+-  resources :shops
++  resources :products do
++    member do
++      post :add_favorite
++      delete :remove_favorite
++    end
++  end
++  resources :shops do
++    member do
++      post :add_favorite
++      delete :remove_favorite
++    end
++  end
++
++  resources :favorites, only: %i[index destroy]
+ end
+diff --git a/config/webpack/environment.js b/config/webpack/environment.js
+index d16d9af..03b504a 100644
+--- a/config/webpack/environment.js
++++ b/config/webpack/environment.js
+@@ -1,3 +1,11 @@
+ const { environment } = require('@rails/webpacker')
+ 
++const webpack = require('webpack')
++
++environment.plugins.append('Provide', new webpack.ProvidePlugin({
++  $: 'jquery',
++  jQuery: 'jquery',
++  Popper: ['popper.js', 'default']
++}))
++
+ module.exports = environment
+diff --git a/db/migrate/20221027093806_devise_create_users.rb b/db/migrate/20221027093806_devise_create_users.rb
+new file mode 100644
+index 0000000..cc0991d
+--- /dev/null
++++ b/db/migrate/20221027093806_devise_create_users.rb
+@@ -0,0 +1,44 @@
++# frozen_string_literal: true
++
++class DeviseCreateUsers < ActiveRecord::Migration[6.1]
++  def change
++    create_table :users do |t|
++      ## Database authenticatable
++      t.string :email,              null: false, default: ""
++      t.string :encrypted_password, null: false, default: ""
++
++      ## Recoverable
++      t.string   :reset_password_token
++      t.datetime :reset_password_sent_at
++
++      ## Rememberable
++      t.datetime :remember_created_at
++
++      ## Trackable
++      # t.integer  :sign_in_count, default: 0, null: false
++      # t.datetime :current_sign_in_at
++      # t.datetime :last_sign_in_at
++      # t.string   :current_sign_in_ip
++      # t.string   :last_sign_in_ip
++
++      ## Confirmable
++      # t.string   :confirmation_token
++      # t.datetime :confirmed_at
++      # t.datetime :confirmation_sent_at
++      # t.string   :unconfirmed_email # Only if using reconfirmable
++
++      ## Lockable
++      # t.integer  :failed_attempts, default: 0, null: false # Only if lock strategy is :failed_attempts
++      # t.string   :unlock_token # Only if unlock strategy is :email or :both
++      # t.datetime :locked_at
++
++
++      t.timestamps null: false
++    end
++
++    add_index :users, :email,                unique: true
++    add_index :users, :reset_password_token, unique: true
++    # add_index :users, :confirmation_token,   unique: true
++    # add_index :users, :unlock_token,         unique: true
++  end
++end
+diff --git a/db/migrate/20221027093921_create_favorites.rb b/db/migrate/20221027093921_create_favorites.rb
+new file mode 100644
+index 0000000..ee9abc8
+--- /dev/null
++++ b/db/migrate/20221027093921_create_favorites.rb
+@@ -0,0 +1,10 @@
++class CreateFavorites < ActiveRecord::Migration[6.1]
++  def change
++    create_table :favorites do |t|
++      t.references :favoriteable, polymorphic: true
++      t.references :user
++
++      t.timestamps
++    end
++  end
++end
+diff --git a/db/schema.rb b/db/schema.rb
+index e05eb52..06cc6dd 100644
+--- a/db/schema.rb
++++ b/db/schema.rb
+@@ -10,7 +10,17 @@
+ #
+ # It's strongly recommended that you check this file into your version control system.
+ 
+-ActiveRecord::Schema.define(version: 2022_03_28_041815) do
++ActiveRecord::Schema.define(version: 2022_10_27_093921) do
++
++  create_table "favorites", force: :cascade do |t|
++    t.string "favoriteable_type"
++    t.integer "favoriteable_id"
++    t.integer "user_id"
++    t.datetime "created_at", precision: 6, null: false
++    t.datetime "updated_at", precision: 6, null: false
++    t.index ["favoriteable_type", "favoriteable_id"], name: "index_favorites_on_favoriteable"
++    t.index ["user_id"], name: "index_favorites_on_user_id"
++  end
+ 
+   create_table "products", force: :cascade do |t|
+     t.integer "shop_id", null: false
+@@ -26,5 +36,17 @@ ActiveRecord::Schema.define(version: 2022_03_28_041815) do
+     t.datetime "updated_at", precision: 6, null: false
+   end
+ 
++  create_table "users", force: :cascade do |t|
++    t.string "email", default: "", null: false
++    t.string "encrypted_password", default: "", null: false
++    t.string "reset_password_token"
++    t.datetime "reset_password_sent_at"
++    t.datetime "remember_created_at"
++    t.datetime "created_at", precision: 6, null: false
++    t.datetime "updated_at", precision: 6, null: false
++    t.index ["email"], name: "index_users_on_email", unique: true
++    t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
++  end
++
+   add_foreign_key "products", "shops"
+ end
+diff --git a/db/seeds.rb b/db/seeds.rb
+index f3a0480..f83ebfe 100644
+--- a/db/seeds.rb
++++ b/db/seeds.rb
+@@ -5,3 +5,15 @@
+ #
+ #   movies = Movie.create([{ name: 'Star Wars' }, { name: 'Lord of the Rings' }])
+ #   Character.create(name: 'Luke', movie: movies.first)
++
++User.create(email: 'test@example.com', password: 'test1234')
++
++Shop.find_or_create_by(name: 'Shop test 1')
++Shop.find_or_create_by(name: 'Shop test 2')
++Shop.find_or_create_by(name: 'Shop test 3')
++
++Shop.all.each do |shop|
++  shop.products.create(name: "Product 1 of #{shop.name}")
++  shop.products.create(name: "Product 2 of #{shop.name}")
++  shop.products.create(name: "Product 3 of #{shop.name}")
++end
+diff --git a/package.json b/package.json
+index 07a6803..0284f11 100644
+--- a/package.json
++++ b/package.json
+@@ -2,10 +2,14 @@
+   "name": "favorite-test",
+   "private": true,
+   "dependencies": {
++    "@popperjs/core": "^2.11.6",
+     "@rails/actioncable": "^6.0.0",
+     "@rails/activestorage": "^6.0.0",
+     "@rails/ujs": "^6.0.0",
+     "@rails/webpacker": "5.4.3",
++    "bootstrap": "^5.2.2",
++    "jquery": "^3.6.1",
++    "popper.js": "^1.16.1",
+     "turbolinks": "^5.2.0",
+     "webpack": "^4.46.0",
+     "webpack-cli": "^3.3.12"
+@@ -13,5 +17,8 @@
+   "version": "0.1.0",
+   "devDependencies": {
+     "webpack-dev-server": "^3"
++  },
++  "scripts": {
++    "start": "./bin/webpack-dev-server"
+   }
+ }
+diff --git a/yarn.lock b/yarn.lock
+index 6db7115..ec7d598 100644
+--- a/yarn.lock
++++ b/yarn.lock
+@@ -951,6 +951,11 @@
+     mkdirp "^1.0.4"
+     rimraf "^3.0.2"
+ 
++"@popperjs/core@^2.11.6":
++  version "2.11.6"
++  resolved "https://registry.yarnpkg.com/@popperjs/core/-/core-2.11.6.tgz#cee20bd55e68a1720bdab363ecf0c821ded4cd45"
++  integrity sha512-50/17A98tWUfQ176raKiOGXuYpLyyVMkxxG6oylzL3BPOlA6ADGdK7EYunSa4I064xerltq9TGXs8HmOk5E+vw==
++
+ "@rails/actioncable@^6.0.0":
+   version "6.1.5"
+   resolved "https://registry.yarnpkg.com/@rails/actioncable/-/actioncable-6.1.5.tgz#c24ec8123a8e7e239ceabda29078df9c93752394"
+@@ -1554,6 +1559,11 @@ boolbase@^1.0.0, boolbase@~1.0.0:
+   resolved "https://registry.yarnpkg.com/boolbase/-/boolbase-1.0.0.tgz#68dff5fbe60c51eb37725ea9e3ed310dcc1e776e"
+   integrity sha1-aN/1++YMUes3cl6p4+0xDcwed24=
+ 
++bootstrap@^5.2.2:
++  version "5.2.2"
++  resolved "https://registry.yarnpkg.com/bootstrap/-/bootstrap-5.2.2.tgz#834e053eed584a65e244d8aa112a6959f56e27a0"
++  integrity sha512-dEtzMTV71n6Fhmbg4fYJzQsw1N29hJKO1js5ackCgIpDcGid2ETMGC6zwSYw09v05Y+oRdQ9loC54zB1La3hHQ==
++
+ brace-expansion@^1.1.7:
+   version "1.1.11"
+   resolved "https://registry.yarnpkg.com/brace-expansion/-/brace-expansion-1.1.11.tgz#3c7fcbf529d87226f3d2f52b966ff5271eb441dd"
+@@ -3836,6 +3846,11 @@ jest-worker@^26.5.0:
+     merge-stream "^2.0.0"
+     supports-color "^7.0.0"
+ 
++jquery@^3.6.1:
++  version "3.6.1"
++  resolved "https://registry.yarnpkg.com/jquery/-/jquery-3.6.1.tgz#fab0408f8b45fc19f956205773b62b292c147a16"
++  integrity sha512-opJeO4nCucVnsjiXOE+/PcCgYw9Gwpvs/a6B1LL/lQhwWwpbVEVYDZ1FokFr8PRc7ghYlrFPuyHuiiDNTQxmcw==
++
+ js-tokens@^4.0.0:
+   version "4.0.0"
+   resolved "https://registry.yarnpkg.com/js-tokens/-/js-tokens-4.0.0.tgz#19203fb59991df98e3a287050d4647cdeaf32499"
+@@ -4793,6 +4808,11 @@ pnp-webpack-plugin@^1.7.0:
+   dependencies:
+     ts-pnp "^1.1.6"
+ 
++popper.js@^1.16.1:
++  version "1.16.1"
++  resolved "https://registry.yarnpkg.com/popper.js/-/popper.js-1.16.1.tgz#2a223cb3dc7b6213d740e40372be40de43e65b1b"
++  integrity sha512-Wb4p1J4zyFTbM+u6WuO4XstYx4Ky9Cewe4DWrel7B0w6VVICvPwdOpotjzcf6eD8TsckVnIMNONQyPIUFOUbCQ==
++
+ portfinder@^1.0.26:
+   version "1.0.28"
+   resolved "https://registry.yarnpkg.com/portfinder/-/portfinder-1.0.28.tgz#67c4622852bd5374dd1dd900f779f53462fac778"
+-- 
+2.25.1
+
